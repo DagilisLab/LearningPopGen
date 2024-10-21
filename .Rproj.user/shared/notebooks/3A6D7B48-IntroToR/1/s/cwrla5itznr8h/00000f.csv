@@ -1,0 +1,4 @@
+"0","tree = read.tree(""results/test.phy.treefile"")"
+"0","tree_plot2 =ggtree(tree,layout=""circular"")+geom_tiplab(size=2)+xlim(0,1.2)"
+"0",""
+"0","plot_grid(tree_plot,tree_plot2)"

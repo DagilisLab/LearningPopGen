@@ -1,0 +1,13 @@
+"0","#| output: false"
+"0","#| tidy: true"
+"0","data = readDNAStringSet(""data/test.fasta"",format=""fasta"")"
+"0","names(data) = sapply(names(data),function(x) paste(strsplit(x,"" "")[[1]][2:3],collapse="" ""))"
+"0","#Align the data - necessary to run further analyses."
+"0","data_aligned=msa(data,method=""ClustalOmega"")"
+"1","using Gonnet
+"
+"0","write.phylip(data_aligned,filepath = ""test.phylip"")"
+"0",""
+"0","data_dist = dist.ml(as.DNAbin(as.alignment(as.matrix(data_aligned))),model=""F81"")"
+"0",""
+"0","test_tree = upgma(data_dist)"

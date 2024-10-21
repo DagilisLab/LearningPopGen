@@ -1,0 +1,7 @@
+"0","#| label: fig-yourtree"
+"0","#| fig-cap: ""A tree of the group you chose"""
+"0","#| warning: false"
+"0",""
+"0","require(ggtree)"
+"0","tree_plot=ggtree(test_tree,layout=""circular"")+geom_tiplab(size=2)+xlim(0,0.2)"
+"0","tree_plot"

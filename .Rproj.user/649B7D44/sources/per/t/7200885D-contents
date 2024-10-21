@@ -1,0 +1,189 @@
+---
+title: "IntroToR"
+author: "Andrius Dagilis"
+format: html
+editor: visual
+---
+
+# Introduction
+
+This document will help explain the basics of writing markdown files in R, annotating code, and in the process ideally get you ready to run some very basic analyses using publicly available data.
+
+Markdown is a markup language - the text here will be read in by any software capable of processing Markdown and displayed appropriately. For instance, we can add a subsection to the document by starting a line with \##
+
+## Running code in Markdown in RStudio
+
+RStudio with markdown installed allows you to create documents that will render into all sorts of useful formats (for instance, pdf in this case).
+
+One of the reasons scientists frequently use R is not because it is pretty, or fast (it is neither of those things), but because it has a very well developed set of `packages` - pre-written scripts that allow you to apply different analyses/approaches that you otherwise might have to code yourself.
+
+Generally, it's good practice to load these packages at the start of any R project, to show what the analyses will depend on. We'll break that good practice here and only load in a few packages.
+
+R syntax is fairly simple once you get the hang of it. A function is used on some object as follows:
+
+```         
+func(x)
+```
+
+This code says - use a function named func on an object called x.
+
+In Markdown documents, we can introduce code blocks as follows:
+
+```{r}
+#This code will be run, so to add text that is not interpreted by R we have to start a line with #
+
+#Let's load a few basic packages
+require(ggplot2)
+require(cowplot)
+
+#We can then run code using these packages. In particular, we'll set a plotting theme to make our plots easier to read in a minute
+
+theme_set(theme_cowplot())
+```
+
+What we've done here is applied the `require(x)` function to on `ggplot2` and `cowplot` packages. This tells R to load in the package if it hasn't been loaded already (and to otherwise do nothing). We then applied the `theme_set()` function on the results of the function `theme_cowplot()`.
+
+### Setting and checking values and types
+
+Objects in R have different types. We can examine object types with the `typeof()` function. Let's do that:
+
+```{r}
+x=20
+y="one"
+z=function(x) return(1)
+
+typeof(x)
+typeof(y)
+typeof(z)
+x
+```
+
+Alright, so as you can see, functions are a type of `closure`, while numbers are generally interpreted as `double` (for double precision) and strings of characters are `character`.
+
+We have also introduced a second idea - we can assign values to objects. In the above code, stating `x=1` sets the value of `x` to 1. R's recommended approach is to set values using "x \<- 1" to do that assignment, but I personally code in enough different languages that I have never developed that habit. Thankfully, `x=1` works just fine. Finally, note how just calling an object (`x` in this case) will return its value.
+
+### Reading in data
+
+Now, let's load in some data to play around with:
+
+```{r}
+
+data=read.table("data/samples.csv",sep=",",header=TRUE)
+head(data)
+
+hist(sort(table(data$species),decreasing=TRUE))
+```
+
+The data table that was loaded in is a bunch of samples of pathogenic fungi that were used for a different project. When we use the `read.table()` function, we have to specify the $path$ to the files. In this case, they are part of the git repository, but you can type in the location of most any file in your system. This particular data file is formatted as a `csv` - comma seperated values. As a result, I tell the `read.table()` function that the separator is a comma `sep=","`, and it has a header (a description of what each column is), so I tell it that `header=TRUE`.
+
+I then use the `head()` function to print out the first few rows of the data table. This helps show some general summary of it. Note that in reading in the data, R has given a type to each column (listed as <chr> - character). If the data contains many numeric columns, those should show up differently. Let's read in some numbers to demonstrate:
+
+```{r}
+sample_pi = read.table("data/blasto_pixy_pi.txt",header=TRUE)
+head(sample_pi)
+```
+
+Now, some columns are showing <int> (integer), others <dbl> (double), and others <chr> (character)
+
+One powerful aspect of R is we can very quickly do some rough analyses of the data. We'll spend the lab meeting walking through the following code to understand it better - take notes about it on the Markdown file.
+
+```{r}
+ggplot(sample_pi,aes(x=window_pos_1/1000000,y=avg_pi,col=pop))+
+  geom_point(size=0.1)+
+  labs(x="Position (Mb)",y="Pairwise diversity")+
+  facet_grid(~chromosome,space="free",scale="free")+
+  theme(panel.spacing = unit(0,"lines"))
+```
+
+In the above plot, we are using ggplot to do the plotting. ggplot is great for many types of complex plots, but the scatter plot is a bit of a mess for this data. Let's try another approach:
+
+```{r}
+require(ggpubr)
+
+ggplot(sample_pi,aes(x=pop,y=avg_pi,fill=pop))+
+  geom_boxplot()+
+  scale_y_continuous(trans="log10")+
+  labs(x="Species",y="Pairwise diversity",fill="Species")+
+  stat_compare_means()
+```
+
+## Accessing public databases
+
+We will frequently be trying to get data from NCBI. There's several avenues to do this, but we'll start with a mostly native R approach. First, we need some packages loaded in:
+
+```{r}
+#| output: false
+require(rentrez)
+require(ape)
+require(phangorn)
+require(msa)
+```
+
+`rentrez` is a package that allows you to interact with the Entrez tools, part of a suite of tools on ncbi. We can use it to search for many different terms in many different databases, for today we will look at genomes.
+
+```{r}
+#| eval: false #this makes sure I don't re-run this anytime I want to output a pdf
+#| tidy: true
+#I first set an api key - this isn't necessary, but makes running code a bit easier. You may get an angry email from ncbi if you abuse this system though, so don't abuse it!
+#my_key=read.table("G:/My Drive/ncbi_key.txt")
+#set_entrez_key(my_key)
+
+#First we search for a group - here, a bunch of fungi, but you choose yours as appropriate
+r_search = entrez_search(db="nucleotide",term="COI[gene] AND Mammals[Orgn] AND 100:1000[SLEN]",use_history = TRUE)
+#We then process the returned results. First we download a summary of each record
+r_summary = entrez_summary(db="nucleotide",web_history = r_search$web_history,retmax=500)
+#Next we ask for what taxon each record belongs to
+taxids = extract_from_esummary(r_summary,"taxid")
+#Finally, we get a list of one sample per taxon - this makes life a little easier
+uids = extract_from_esummary(r_summary,"uid")[match(unique(taxids),taxids)]
+r_fastas = entrez_fetch(db="nucleotide",id=uids,rettype="fasta")
+write(r_fastas,"data/test.fasta")
+```
+
+And then align and make a tree:
+
+```{r}
+#| output: false
+#| tidy: true
+data = readDNAStringSet("data/test.fasta",format="fasta")
+names(data) = sapply(names(data),function(x) paste(strsplit(x," ")[[1]][2:3],collapse=" "))
+#Align the data - necessary to run further analyses.
+data_aligned=msa(data,method="ClustalOmega")
+write.phylip(data_aligned,filepath = "test.phylip")
+
+data_dist = dist.ml(as.DNAbin(as.alignment(as.matrix(data_aligned))),model="F81")
+
+test_tree = upgma(data_dist)
+```
+
+Then, we can ask Qarto to display @fig-yourtree:
+
+```{r}
+#| label: fig-yourtree
+#| fig-cap: "A tree of the group you chose"
+#| warning: false
+
+require(ggtree)
+tree_plot=ggtree(test_tree,layout="rectangular")+geom_tiplab(size=2)
+tree_plot
+```
+
+You've made a tree! Congrats! Now, we chose some arbitrary parameters for the tree, and it's not the best phylogenetic approach (UPGMA is simple and fast, but inaccurate). So we can do better, but for that we'll have to leave the comforts of R and start using the command line.
+
+## IQtree2
+
+Now let's analyze that data with a better piece of software for phylogenetic analysis: `iqTree2`. First, we'll need to install it. Installation will vary depending on your system, but I will assume you are using the command line for any of them. The end result should look like:
+
+```{bash}
+
+iqtree2 -nt AUTO -s data/test.phylip
+```
+
+IQtree has a bunch of convenience functions - it will choose the best evolutionary model for you, it can run very rapid bootstrapping, it can use a variety of data types, etc.
+
+Once you have a tree generated:
+
+```{r}
+tree = read.tree("results/test.phy.treefile")
+ggtree(tree,layout="circular")+geom_tiplab(size=2)
+```
