@@ -193,4 +193,4 @@ plot_grid(tree_plot,tree_plot2)
 
 ## New section on mafft
 
-Mafft is cool but, not always.
+Mafft is cool but, not always. keep editing this file, after Cappy has made changes. So I'm adding something here, but Cappy did not add this.
