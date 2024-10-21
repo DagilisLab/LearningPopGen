@@ -192,3 +192,5 @@ plot_grid(tree_plot,tree_plot2)
 ```
 
 ## New section on mafft
+
+Mafft is cool but, not always.
