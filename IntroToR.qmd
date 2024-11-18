@@ -1,4 +1,5 @@
 ---
+a---
 title: "IntroToR"
 author: "Andrius Dagilis"
 format: html
@@ -126,11 +127,11 @@ require(cowplot)
 #| eval: false #this makes sure I don't re-run this anytime I want to output a pdf
 #| tidy: true
 #I first set an api key - this isn't necessary, but makes running code a bit easier. You may get an angry email from ncbi if you abuse this system though, so don't abuse it!
-my_key=read.table("G:/My Drive/ncbi_key.txt")
-set_entrez_key(my_key)
+
 
 #First we search for a group - here, a bunch of fungi, but you choose yours as appropriate
-r_search = entrez_search(db="nucleotide",term="COI[gene] AND Simiiformes[ORGN] AND 100:1000[SLEN]",use_history = TRUE)
+#play around with the [ORGN] by putting in different species
+r_search = entrez_search(db="nucleotide",term="COI[gene] AND canidae[ORGN] AND 100:1000[SLEN]",use_history = TRUE)
 #We then process the returned results. First we download a summary of each record
 r_summary = entrez_summary(db="nucleotide",web_history = r_search$web_history,retmax=500)
 #Next we ask for what taxon each record belongs to
@@ -138,7 +139,7 @@ taxids = extract_from_esummary(r_summary,"taxid")
 #Finally, we get a list of one sample per taxon - this makes life a little easier
 uids = extract_from_esummary(r_summary,"uid")[match(unique(taxids),taxids)]
 r_fastas = entrez_fetch(db="nucleotide",id=uids,rettype="fasta")
-write(r_fastas,"data/test.fasta")
+write(r_fastas,"test.fasta")
 ```
 
 And then align and make a tree:
@@ -147,10 +148,27 @@ And then align and make a tree:
 #| output: false
 #| tidy: true
 data = readDNAStringSet("data/test.fasta",format="fasta")
-names(data) = sapply(names(data),function(x) paste(strsplit(x," ")[[1]][2:3],collapse=" "))
+#names(data) = sapply(names(data),function(x) paste(strsplit(x," ")[[1]][2:3],collapse=" "))
 #Align the data - necessary to run further analyses.
 data_aligned=msa(data,method="ClustalOmega")
-write.phylip(data_aligned,filepath = "test.phylip")
+#writing fasta function from stackoverflow
+
+alignment2Fasta <- function(alignment, filename) {
+    sink(filename)
+    
+    n <- length(rownames(alignment))
+    for(i in seq(1, n)) {
+        cat(paste0('>', rownames(alignment)[i]))
+        cat('\n')
+        the.sequence <- toString(unmasked(alignment)[[i]])
+        cat(the.sequence)
+        cat('\n')  
+    }
+    
+    sink(NULL)
+}
+
+alignment2Fasta(data_aligned,"test_aligned.fasta")
 
 data_dist = dist.ml(as.DNAbin(as.alignment(as.matrix(data_aligned))),model="F81")
 
@@ -182,11 +200,23 @@ iqtree2 -nt AUTO -s data/test.phylip
 
 IQtree has a bunch of convenience functions - it will choose the best evolutionary model for you, it can run very rapid bootstrapping, it can use a variety of data types, etc.
 
-Once you have a tree generated, you can place it in results, and visualize back in R.
+Once you have a tree generated:
 
 ```{r}
-tree = read.tree("results/test.phy.treefile")
+tree = read.tree("~/Documents/LearningPopGen/test_aligned.fasta.treefile")
 tree_plot2 =ggtree(tree,layout="circular")+geom_tiplab(size=2)+xlim(0,1.2)
 
 plot_grid(tree_plot,tree_plot2)
+```
+
+## New section on mafft
+
+Mafft is cool but, not always. keep editing this file, after Cappy has made changes. So I'm adding something here, but Cappy did not add this.
+
+-   load in the results, can figure it out, ape, read tree function, read iq tree, tree io package, gg tree
+
+-   on cluster –\>
+
+```{r}
+
 ```
