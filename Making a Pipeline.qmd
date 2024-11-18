@@ -1,0 +1,124 @@
+---
+title: "Creating a pipeline"
+author: "Andrius J. Dagilis"
+format: html
+editor: visual
+---
+
+## How to make a pipeline
+
+So far, you have learned to:
+
+1.  Learn to run and edit code in R
+
+2.  Run external applications (mafft/iqtree/whatever else) on resulting data.
+
+3.  Ideally - how to organize your documents to a certain degree.
+
+    1.  Use Project folders!
+
+    2.  Ideally, keep your data, result and figure files in separate folders within each project.
+
+Today, we'll talk about taking these separate bits together to build a *pipeline*, something that lets you take an input (for instance, taxon/gene name) and run all of the steps of an analysis programatically on the results. We'll do this in R, but be aware you can write these pipeline scripts in any language.
+
+## Starting a pipeline: organize your folder
+
+The place to start when developing a pipeline is actually to think about what the individual files involved will be, and, therefore, how to best organize your project folder. You will have several general categories of files. We can start by visualizing what the current folder structure looks like. If you have fetched the latest version of the repository, it should look like:
+
+![](images/clipboard-157620235.png)
+
+So, there are 5 folders, including some defaults that Quarto projects create (`IntroToR_files/`, `images/`), as well as multiple folders that I have made:
+
+`data/` : to store any downloaded data, or data that is generated outside of the pipeline (for instance, list of species we might want to study.
+
+`figures/` : to store any figures we generate throughout the analysis.
+
+`scripts/` : to store any scripts we might want to run.
+
+`results/` : to store any results of scripts we run in the pipeline.
+
+Aside from that, we have several `.qmd` files that are the write-ups of different things we are learning (more of these will appear in the future as we learn to plot better, etc.)
+
+We then want to know what our pipeline will accomplish. In this case, we know the intermediary files we'll make since we've worked through the pipeline in each piece.
+
+1\) Download `.fasta` sequences from NCBI using `R`. This can go into the `data/` folder.
+
+2\) Align the sequences using `mafft` . This can go into the `results/` folder.
+
+3\) Run `iqtree2` on the resulting alignment, and make a plot in `R`. The tree can be output to `results/`, the figure can be put into `figures/`
+
+## Thinking programatically
+
+When we convert different pieces of code we've run to a pipeline, we are making the input and output of each file a variable rather than a constant. That is in some ways a very simple thing to do, but in practice it can be quite difficult to do this in a way that makes the code run efficiently/at all. Let's go back to downloading data from NCBI, and think about how we can make this code more programatic:
+
+```{r}
+require(rentrez)
+require(ape)
+
+
+#First we search for a group - here, a bunch of fungi, but you choose yours as appropriate
+r_search = entrez_search(db="nucleotide",term="COI[gene] AND Simiiformes[ORGN] AND 100:1000[SLEN]",use_history = TRUE)
+#We then process the returned results. First we download a summary of each record
+r_summary = entrez_summary(db="nucleotide",web_history = r_search$web_history,retmax=500)
+#Next we ask for what taxon each record belongs to
+taxids = extract_from_esummary(r_summary,"taxid")
+#Finally, we get a list of one sample per taxon - this makes life a little easier
+uids = extract_from_esummary(r_summary,"uid")[match(unique(taxids),taxids)]
+r_fastas = entrez_fetch(db="nucleotide",id=uids,rettype="fasta")
+write(r_fastas,"data/test.fasta")
+```
+
+There are many parts of this code that are *hard* coded - that is, we have specified specific names/search terms. To make this code more amenable to a pipeline, we might want to start by editing this code to make those terms be variable. Let's do so below by making two new variables: `search_term`, `file_prefix` and `output_fasta`.
+
+```{r}
+
+#Set some variables
+search_term = "COI[gene] AND 100:1000[SLEN] AND simiiformes[ORGN]"
+file_prefix = "COI_simiiformes"
+output_fasta = paste("data/",file_prefix,".fasta",sep="")
+
+#Run the code to get a fasta
+##First search
+r_search = entrez_search(db="nucleotide",term=search_term,use_history = TRUE)
+##We then process the returned results. First we download a summary of each record
+r_summary = entrez_summary(db="nucleotide",web_history = r_search$web_history,retmax=500)
+##Next we ask for what taxon each record belongs to
+taxids = extract_from_esummary(r_summary,"taxid")
+##Finally, we get a list of one sample per taxon - this makes life a little easier
+uids = extract_from_esummary(r_summary,"uid")[match(unique(taxids),taxids)]
+##Fetch the fastas
+r_fastas = entrez_fetch(db="nucleotide",id=uids,rettype="fasta")
+##And write out the fasta
+
+write(r_fastas,file=output_fasta)
+```
+
+The resulting code is a little bit easier to think about in terms of how we can turn at least this part of the code into a function. Note how rather than making `output_fasta` be hard coded (e.g. `output_fasta = "data/COI_simiiformes.fasta"` we are naming it based on a different variable. We can take this a step further - what if we allowed the user of the script to specify the taxon and a gene, and the rest ran on its own?
+
+```{r}
+
+#User can edit these:
+gene = "COI"
+taxon = "simiiformes"
+
+#Set some variables
+
+search_term = paste(gene,"[gene] AND 100:1000[SLEN] AND ",taxon"[ORGN]",sep="")
+file_prefix = paste(gene,taxon,sep="_")
+output_fasta = paste("data/",file_prefix,".fasta",sep="")
+
+#Run the code to get a fasta
+##First search
+r_search = entrez_search(db="nucleotide",term=search_term,use_history = TRUE)
+##We then process the returned results. First we download a summary of each record
+r_summary = entrez_summary(db="nucleotide",web_history = r_search$web_history,retmax=500)
+##Next we ask for what taxon each record belongs to
+taxids = extract_from_esummary(r_summary,"taxid")
+##Finally, we get a list of one sample per taxon - this makes life a little easier
+uids = extract_from_esummary(r_summary,"uid")[match(unique(taxids),taxids)]
+##Fetch the fastas
+r_fastas = entrez_fetch(db="nucleotide",id=uids,rettype="fasta")
+##And write out the fasta
+
+write(r_fastas,file=output_fasta)
+```

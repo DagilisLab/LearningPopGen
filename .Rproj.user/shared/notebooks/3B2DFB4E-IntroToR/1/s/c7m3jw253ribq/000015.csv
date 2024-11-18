@@ -1,9 +1,0 @@
-"0","ggplot(sample_pi,aes(x=window_pos_1/1000000,y=avg_pi,col=pop))+"
-"0","  geom_point(size=0.1)+"
-"0","  labs(x=""Position (Mb)"",y=""Pairwise diversity"")+"
-"0","  facet_grid(~chromosome,space=""free"",scale=""free"")+"
-"0","  theme(panel.spacing = unit(0,""lines""))"
-"2","Warning:"
-"2"," [38;5;254mRemoved 10164 rows containing missing values or values outside the scale
-range (`geom_point()`).[39m
-"
