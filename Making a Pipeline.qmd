@@ -68,20 +68,57 @@ r_fastas = entrez_fetch(db="nucleotide",id=uids,rettype="fasta")
 write(r_fastas,"data/test.fasta")
 ```
 
-There are many parts of this code that are *hard* coded - that is, we have specified specific names/search terms. To make this code more amenable to a pipeline, we might want to start by editing this code to make those terms be variable. Let's do so below:
+There are many parts of this code that are *hard* coded - that is, we have specified specific names/search terms. To make this code more amenable to a pipeline, we might want to start by editing this code to make those terms be variable. Let's do so below by making two new variables: `search_term`, `file_prefix` and `output_fasta`.
 
 ```{r}
 
-#First we search for a group - here, a bunch of fungi, but you choose yours as appropriate
+#Set some variables
 search_term = "COI[gene] AND 100:1000[SLEN] AND simiiformes[ORGN]"
+file_prefix = "COI_simiiformes"
+output_fasta = paste("data/",file_prefix,".fasta",sep="")
+
+#Run the code to get a fasta
+##First search
 r_search = entrez_search(db="nucleotide",term=search_term,use_history = TRUE)
-#We then process the returned results. First we download a summary of each record
+##We then process the returned results. First we download a summary of each record
 r_summary = entrez_summary(db="nucleotide",web_history = r_search$web_history,retmax=500)
-#Next we ask for what taxon each record belongs to
+##Next we ask for what taxon each record belongs to
 taxids = extract_from_esummary(r_summary,"taxid")
-#Finally, we get a list of one sample per taxon - this makes life a little easier
+##Finally, we get a list of one sample per taxon - this makes life a little easier
 uids = extract_from_esummary(r_summary,"uid")[match(unique(taxids),taxids)]
+##Fetch the fastas
 r_fastas = entrez_fetch(db="nucleotide",id=uids,rettype="fasta")
-output_file = "data/test.fasta"
-write(r_fastas,file=output_file)
+##And write out the fasta
+
+write(r_fastas,file=output_fasta)
+```
+
+The resulting code is a little bit easier to think about in terms of how we can turn at least this part of the code into a function. Note how rather than making `output_fasta` be hard coded (e.g. `output_fasta = "data/COI_simiiformes.fasta"` we are naming it based on a different variable. We can take this a step further - what if we allowed the user of the script to specify the taxon and a gene, and the rest ran on its own?
+
+```{r}
+
+#User can edit these:
+gene = "COI"
+taxon = "simiiformes"
+
+#Set some variables
+
+search_term = paste(gene,"[gene] AND 100:1000[SLEN] AND ",taxon"[ORGN]",sep="")
+file_prefix = paste(gene,taxon,sep="_")
+output_fasta = paste("data/",file_prefix,".fasta",sep="")
+
+#Run the code to get a fasta
+##First search
+r_search = entrez_search(db="nucleotide",term=search_term,use_history = TRUE)
+##We then process the returned results. First we download a summary of each record
+r_summary = entrez_summary(db="nucleotide",web_history = r_search$web_history,retmax=500)
+##Next we ask for what taxon each record belongs to
+taxids = extract_from_esummary(r_summary,"taxid")
+##Finally, we get a list of one sample per taxon - this makes life a little easier
+uids = extract_from_esummary(r_summary,"uid")[match(unique(taxids),taxids)]
+##Fetch the fastas
+r_fastas = entrez_fetch(db="nucleotide",id=uids,rettype="fasta")
+##And write out the fasta
+
+write(r_fastas,file=output_fasta)
 ```
