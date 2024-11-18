@@ -54,6 +54,7 @@ When we convert different pieces of code we've run to a pipeline, we are making 
 ```{r}
 require(rentrez)
 require(ape)
+require(ggtree)
 
 
 #First we search for a group - here, a bunch of fungi, but you choose yours as appropriate
@@ -103,7 +104,7 @@ taxon = "simiiformes"
 
 #Set some variables
 
-search_term = paste(gene,"[gene] AND 100:1000[SLEN] AND ",taxon"[ORGN]",sep="")
+search_term = paste(gene,"[gene] AND 100:1000[SLEN] AND ",taxon,"[ORGN]",sep="")
 file_prefix = paste(gene,taxon,sep="_")
 output_fasta = paste("data/",file_prefix,".fasta",sep="")
 
@@ -121,4 +122,97 @@ r_fastas = entrez_fetch(db="nucleotide",id=uids,rettype="fasta")
 ##And write out the fasta
 
 write(r_fastas,file=output_fasta)
+```
+
+Now we have code that only require two minor edits to create the fasta. We also know what that fasta will be called, and where it will be, so we can capitalize on R's ability to make system calls to make commands to run `mafft` and `iqtree2`. It can look like the following:
+
+```{r}
+
+
+#User can edit these:
+gene = "COI"
+taxon = "simiiformes"
+
+#Set some variables
+
+search_term = paste(gene,"[gene] AND 100:1000[SLEN] AND ",taxon,"[ORGN]",sep="")
+file_prefix = paste(gene,taxon,sep="_")
+output_fasta = paste("data/",file_prefix,".fasta",sep="")
+
+#Run the code to get a fasta
+##First search
+r_search = entrez_search(db="nucleotide",term=search_term,use_history = TRUE)
+##We then process the returned results. First we download a summary of each record
+r_summary = entrez_summary(db="nucleotide",web_history = r_search$web_history,retmax=500)
+##Next we ask for what taxon each record belongs to
+taxids = extract_from_esummary(r_summary,"taxid")
+##Finally, we get a list of one sample per taxon - this makes life a little easier
+uids = extract_from_esummary(r_summary,"uid")[match(unique(taxids),taxids)]
+##Fetch the fastas
+r_fastas = entrez_fetch(db="nucleotide",id=uids,rettype="fasta")
+##And write out the fasta
+
+write(r_fastas,file=output_fasta)
+
+## Align the fasta
+
+aligned_fasta = paste("results/",output_prefix,".aligned.fasta")
+mafft_call = paste("mafft --auto ",output_fasta," > ",aligned_fasta)
+system(mafft_call)
+
+## Run iqtree2
+
+
+iqtree_call = paste("iqtree2 -s ",aligned_fasta,"--prefix results/",output_prefix,sep="")
+system(iqtree_call)
+
+## Finally, we can make the plot in R
+tree_name = paste("results/",output_prefix,".treefile")
+tree = read.tree(tree_name)
+tree_plot = ggtree(tree)+geom_tiplab()
+
+```
+
+The above is a little hard to test from inside Rstudio in some cases, and besides it is hard to run the whole thing as a single big .Rmd file. Instead, let's make it fully a function so that we can execute it very simply.
+
+```{r}
+
+tree_pipeline = function(gene,taxon) {
+  search_term = paste(gene,"[gene] AND 100:1000[SLEN] AND ",taxon,"[ORGN]",sep="")
+  file_prefix = paste(gene,taxon,sep="_")
+  output_fasta = paste("data/",file_prefix,".fasta",sep="")
+
+  #Run the code to get a fasta
+  ##First search
+  r_search = entrez_search(db="nucleotide",term=search_term,use_history = TRUE)
+  ##We then process the returned results. First we download a summary of each   record
+  r_summary = entrez_summary(db="nucleotide",web_history = r_search$web_history,retmax=500)
+  ##Next we ask for what taxon each record belongs to
+  taxids = extract_from_esummary(r_summary,"taxid")
+  ##Finally, we get a list of one sample per taxon - this makes life a little easier
+  uids = extract_from_esummary(r_summary,"uid")[match(unique(taxids),taxids)]
+  ##Fetch the fastas
+  r_fastas = entrez_fetch(db="nucleotide",id=uids,rettype="fasta")
+  ##And write out the fasta
+
+  write(r_fastas,file=output_fasta)
+
+  ## Align the fasta
+
+  aligned_fasta = paste("results/",output_prefix,".aligned.fasta")
+  mafft_call = paste("mafft --auto ",output_fasta," > ",aligned_fasta)
+  system(mafft_call)
+
+  ## Run iqtree2
+
+
+  iqtree_call = paste("iqtree2 -s ",aligned_fasta,"--prefix results/",output_prefix,sep="")
+  system(iqtree_call)
+
+  ## Finally, we can make the plot in R
+  tree_name = paste("results/",output_prefix,".treefile")
+  tree = read.tree(tree_name)
+  tree_plot = ggtree(tree)+geom_tiplab()
+  return(tree_plot)
+}
 ```
